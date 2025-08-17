@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
   # Smart Contract Testing
@@ -19,9 +19,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: contract/package-lock.json
+        node-version: '22'
         
     - name: Install contract dependencies
       working-directory: ./contract
@@ -47,9 +45,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: client/package-lock.json
+        node-version: '22'
         
     - name: Install frontend dependencies
       working-directory: ./client
@@ -85,8 +81,8 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        
+        node-version: '22'
+
     - name: Audit contract dependencies
       working-directory: ./contract
       run: npm audit --audit-level=moderate
@@ -110,7 +106,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
 
     - name: Install contract dependencies
       working-directory: ./contract
@@ -148,7 +144,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
 
     - name: Install frontend dependencies
       working-directory: ./client
@@ -176,8 +172,8 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        
+        node-version: '22'
+
     - name: Install dependencies
       run: |
         cd contract && npm install
