@@ -1,0 +1,41 @@
+{
+  "name": "contract",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy-counter.ts --network localhost",
+    "deploy:token": "npx hardhat run scripts/deploy-token.ts --network localhost",
+    "deploy:all": "npm run deploy && npm run deploy:token",
+    "deploy:sepolia": "npx hardhat run scripts/deploy-testnet.ts --network sepolia",
+    "deploy:goerli": "npx hardhat run scripts/deploy-testnet.ts --network goerli",
+    "verify:sepolia": "npx hardhat verify --network sepolia",
+    "verify:goerli": "npx hardhat verify --network goerli",
+    "node": "npx hardhat node",
+    "clean": "npx hardhat clean",
+    "size": "npx hardhat size-contracts",
+    "gas": "REPORT_GAS=true npx hardhat test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.0",
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.0",
+    "@types/chai": "^4.3.20",
+    "@types/chai-as-promised": "^8.0.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.17.2",
+    "chai": "^5.2.1",
+    "ethers": "^6.15.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.0.0",
+    "mocha": "^11.7.1",
+    "typescript": "~5.8.0"
+  },
+  "type": "module"
+}
