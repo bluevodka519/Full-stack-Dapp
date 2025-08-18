@@ -811,15 +811,17 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
             <h3 className="text-md font-semibold mb-3">ETH Management</h3>
 
             {/* ETH Balances */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className={`grid gap-4 mb-4 ${isOwner ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
               <div className="p-3 bg-white rounded border">
                 <p className="text-sm font-medium text-gray-700">Your ETH in Contract</p>
                 <p className="text-2xl font-bold text-blue-600">{parseFloat(userEthBalance).toLocaleString()} ETH</p>
               </div>
-              <div className="p-3 bg-white rounded border">
-                <p className="text-sm font-medium text-gray-700">Total Contract ETH</p>
-                <p className="text-2xl font-bold text-purple-600">{parseFloat(contractEthBalance).toLocaleString()} ETH</p>
-              </div>
+              {isOwner && (
+                <div className="p-3 bg-white rounded border">
+                  <p className="text-sm font-medium text-gray-700">Total Contract ETH</p>
+                  <p className="text-2xl font-bold text-purple-600">{parseFloat(contractEthBalance).toLocaleString()} ETH</p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -966,20 +968,30 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
                         <div>
                           <p className="font-medium text-gray-700">Status</p>
                           {stake.claimed ? (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">Claimed</span>
+                            <div>
+                              <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">Claimed</span>
+                            </div>
                           ) : new Date() >= stake.unlockTime ? (
-                            <button
-                              onClick={() => unstakeTokens(index)}
-                              disabled={loading}
-                              className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs disabled:opacity-50"
-                            >
-                              Unstake
-                            </button>
+                            <div>
+                              <button
+                                onClick={() => unstakeTokens(index)}
+                                disabled={loading}
+                                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs disabled:opacity-50 mb-1"
+                              >
+                                Unstake
+                              </button>
+                              <p className="text-xs text-green-600">Ready to unstake!</p>
+                            </div>
                           ) : (
                             <div>
-                              <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">Locked</span>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Until: {stake.unlockTime.toLocaleDateString()}
+                              <button
+                                disabled={true}
+                                className="px-3 py-1 bg-gray-300 text-gray-500 rounded text-xs cursor-not-allowed mb-1"
+                              >
+                                Unstake
+                              </button>
+                              <p className="text-xs text-gray-500">
+                                Locked until: {stake.unlockTime.toLocaleDateString()}
                               </p>
                             </div>
                           )}
