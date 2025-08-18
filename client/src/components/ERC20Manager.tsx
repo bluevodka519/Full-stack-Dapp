@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 
+// Contract Configuration
+const DEFAULT_CONTRACT_ADDRESS = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'
+const CONTRACT_NETWORK = 'Hardhat Local Network'
+
 interface TokenInfo {
   name: string
   symbol: string
@@ -85,7 +89,7 @@ interface ERC20ManagerProps {
 
 export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
   // Connection states
-  const [tokenAddress, setTokenAddress] = useState<string>('')
+  const [tokenAddress, setTokenAddress] = useState<string>(DEFAULT_CONTRACT_ADDRESS)
   const [tokenContract, setTokenContract] = useState<ethers.Contract | null>(null)
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [tokenBalance, setTokenBalance] = useState<string>('0')
@@ -115,6 +119,9 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
 
   // History
   const [transferHistory, setTransferHistory] = useState<TokenTransferRecord[]>([])
+
+  // UI states
+  const [showContractCode, setShowContractCode] = useState<boolean>(false)
 
   /**
    * Connect to ERC20 token contract
@@ -607,26 +614,128 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
     <div className="space-y-6">
       {/* Token Connection */}
       <div className="p-4 bg-gray-50 rounded-lg">
-        <h2 className="text-lg font-semibold mb-2">ERC20 Token Connection</h2>
-        <div className="flex gap-2 mb-2">
+        <h2 className="text-lg font-semibold mb-3">DApp Token Contract</h2>
+
+        {/* Contract Info */}
+        <div className="mb-4 p-3 bg-blue-50 rounded border">
+          <h3 className="text-sm font-semibold mb-2">📋 Contract Information</h3>
+          <div className="text-xs space-y-1">
+            <p><span className="font-medium">Network:</span> {CONTRACT_NETWORK}</p>
+            <p><span className="font-medium">Address:</span> <code className="bg-gray-100 px-1 rounded">{DEFAULT_CONTRACT_ADDRESS}</code></p>
+            <p><span className="font-medium">Features:</span> ERC20 Token + Staking + ETH Management</p>
+          </div>
+        </div>
+
+        {/* Connection */}
+        <div className="flex gap-2 mb-3">
           <input
             type="text"
-            placeholder="Enter token contract address"
+            placeholder="Contract address (auto-filled)"
             value={tokenAddress}
             onChange={(e) => setTokenAddress(e.target.value)}
-            className="flex-1 px-3 py-2 border rounded"
+            className="flex-1 px-3 py-2 border rounded text-sm"
           />
           <button
             onClick={connectToken}
             disabled={loading}
             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
           >
-            {loading ? 'Connecting...' : 'Connect Token'}
+            {loading ? 'Connecting...' : 'Connect'}
           </button>
         </div>
+
+        {/* Contract Code Toggle */}
+        <div className="mb-2">
+          <button
+            onClick={() => setShowContractCode(!showContractCode)}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            {showContractCode ? '🔼 Hide Contract Code' : '🔽 View Contract Code'}
+          </button>
+        </div>
+
         <p className="text-xs text-gray-500">
-          Deploy DAppToken contract first, then enter the contract address
+          Contract is pre-deployed on Hardhat local network. Click Connect to start using the DApp.
         </p>
+
+        {/* Contract Code Display */}
+        {showContractCode && (
+          <div className="mt-4 p-3 bg-gray-100 rounded border">
+            <h3 className="text-sm font-semibold mb-2">📄 Smart Contract Code (DAppToken.sol)</h3>
+            <div className="text-xs bg-white p-3 rounded border max-h-96 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-gray-800">
+{`// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+/**
+ * @title DAppToken
+ * @dev Full-featured ERC20 token with staking and ETH management
+ * Features:
+ * - Standard ERC20 functionality (transfer, approve, etc.)
+ * - Token staking with time-locked rewards
+ * - ETH deposit and withdrawal management
+ * - Owner functions for minting and burning
+ */
+contract DAppToken {
+    // ERC20 Basic Information
+    string public name = "DApp Demo Token";
+    string public symbol = "DDT";
+    uint8 public decimals = 18;
+    uint256 public totalSupply;
+    address public owner;
+
+    // Token balances and allowances
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    // ETH balance tracking for each user
+    mapping(address => uint256) public ethBalanceOf;
+
+    // Staking functionality
+    struct StakeInfo {
+        uint256 amount;      // Staked token amount
+        uint256 startTime;   // Stake start timestamp
+        uint256 duration;    // Stake duration in seconds
+        uint256 unlockTime;  // When stake can be withdrawn
+        bool claimed;        // Whether stake has been claimed
+    }
+
+    mapping(address => StakeInfo[]) public stakes;
+    mapping(address => uint256) public totalStaked;
+
+    // Staking rewards: 5% APY for 1 month, 8% for 3 months, etc.
+    mapping(uint256 => uint256) public stakingRewards;
+
+    // Events
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event EthDeposited(address indexed from, uint256 value);
+    event EthWithdrawn(address indexed to, uint256 value);
+    event TokensStaked(address indexed user, uint256 amount, uint256 duration);
+    event TokensUnstaked(address indexed user, uint256 amount, uint256 reward);
+
+    // Main Functions:
+    // 1. ERC20 functions: transfer(), approve(), transferFrom()
+    // 2. Staking functions: stakeTokens(), unstakeTokens()
+    // 3. ETH management: deposit ETH, withdrawMyEth()
+    // 4. Owner functions: mint(), burn()
+
+    // ... (Full implementation available in contract/contracts/DAppToken.sol)
+}`}
+              </pre>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              <p><strong>Key Features:</strong></p>
+              <ul className="list-disc list-inside space-y-1 mt-1">
+                <li><strong>ERC20 Token:</strong> Standard token with transfer, approve functionality</li>
+                <li><strong>Staking System:</strong> Lock tokens for rewards (5%-20% APY based on duration)</li>
+                <li><strong>ETH Management:</strong> Deposit and withdraw ETH, tracked per user</li>
+                <li><strong>Owner Functions:</strong> Mint new tokens, burn tokens</li>
+                <li><strong>Security:</strong> Time-locked staking, user-specific ETH balances</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Token Information */}
@@ -850,9 +959,6 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
               {/* Withdraw Your ETH */}
               <div>
                 <h4 className="text-sm font-semibold mb-2">Withdraw Your ETH</h4>
-                <p className="text-xs text-gray-600 mb-2">
-                  You can withdraw ETH that you previously deposited
-                </p>
                 <div className="space-y-2">
                   <input
                     type="number"
