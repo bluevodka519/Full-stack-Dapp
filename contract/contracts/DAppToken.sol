@@ -30,6 +30,8 @@ contract DAppToken {
     event Mint(address indexed to, uint256 value);
     event Burn(address indexed from, uint256 value);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event EthDeposited(address indexed from, uint256 value);
+    event EthWithdrawn(address indexed to, uint256 value);
     
     // Modifiers
     modifier onlyOwner() {
@@ -175,11 +177,74 @@ contract DAppToken {
      * @param _spender Address of spender
      * @return remaining Remaining allowance
      */
-    function getAllowance(address _owner, address _spender) 
-        public 
-        view 
-        returns (uint256 remaining) 
+    function getAllowance(address _owner, address _spender)
+        public
+        view
+        returns (uint256 remaining)
     {
         return allowance[_owner][_spender];
+    }
+
+    /**
+     * @dev Receive ETH deposits
+     * Allows the contract to receive ETH directly
+     */
+    receive() external payable {
+        require(msg.value > 0, "DAppToken: deposit amount must be positive");
+        emit EthDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @dev Fallback function to receive ETH
+     * Called when msg.data is not empty
+     */
+    fallback() external payable {
+        require(msg.value > 0, "DAppToken: deposit amount must be positive");
+        emit EthDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @dev Withdraw ETH from contract (only owner)
+     * @param _amount Amount of ETH to withdraw (in wei)
+     */
+    function withdrawEth(uint256 _amount) external onlyOwner {
+        require(_amount > 0, "DAppToken: withdraw amount must be positive");
+        require(address(this).balance >= _amount, "DAppToken: insufficient ETH balance");
+
+        payable(owner).transfer(_amount);
+        emit EthWithdrawn(owner, _amount);
+    }
+
+    /**
+     * @dev Withdraw all ETH from contract (only owner)
+     */
+    function withdrawAllEth() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "DAppToken: no ETH to withdraw");
+
+        payable(owner).transfer(balance);
+        emit EthWithdrawn(owner, balance);
+    }
+
+    /**
+     * @dev Get contract's ETH balance
+     * @return balance ETH balance in wei
+     */
+    function getEthBalance() external view returns (uint256 balance) {
+        return address(this).balance;
+    }
+
+    /**
+     * @dev Emergency withdraw function with safer transfer method
+     * @param _amount Amount of ETH to withdraw (in wei)
+     */
+    function emergencyWithdraw(uint256 _amount) external onlyOwner {
+        require(_amount > 0, "DAppToken: withdraw amount must be positive");
+        require(address(this).balance >= _amount, "DAppToken: insufficient ETH balance");
+
+        (bool success, ) = payable(owner).call{value: _amount}("");
+        require(success, "DAppToken: ETH transfer failed");
+
+        emit EthWithdrawn(owner, _amount);
     }
 }

@@ -230,19 +230,122 @@ describe("DAppToken Contract", function () {
     });
   });
 
+  describe("ETH Functionality", function () {
+    it("Should receive ETH deposits", async function () {
+      const depositAmount = ethers.parseEther("1");
+
+      await expect(
+        addr1.sendTransaction({
+          to: await token.getAddress(),
+          value: depositAmount
+        })
+      ).to.emit(token, "EthDeposited")
+        .withArgs(addr1.address, depositAmount);
+
+      expect(await token.getEthBalance()).to.equal(depositAmount);
+    });
+
+    it("Should allow owner to withdraw ETH", async function () {
+      const depositAmount = ethers.parseEther("2");
+      const withdrawAmount = ethers.parseEther("1");
+
+      // Deposit ETH
+      await addr1.sendTransaction({
+        to: await token.getAddress(),
+        value: depositAmount
+      });
+
+      // Withdraw ETH
+      await expect(
+        token.withdrawEth(withdrawAmount)
+      ).to.emit(token, "EthWithdrawn")
+        .withArgs(owner.address, withdrawAmount);
+
+      expect(await token.getEthBalance()).to.equal(depositAmount - withdrawAmount);
+    });
+
+    it("Should allow owner to withdraw all ETH", async function () {
+      const depositAmount = ethers.parseEther("3");
+
+      // Deposit ETH
+      await addr1.sendTransaction({
+        to: await token.getAddress(),
+        value: depositAmount
+      });
+
+      // Withdraw all ETH
+      await expect(
+        token.withdrawAllEth()
+      ).to.emit(token, "EthWithdrawn")
+        .withArgs(owner.address, depositAmount);
+
+      expect(await token.getEthBalance()).to.equal(0);
+    });
+
+    it("Should reject ETH withdrawal by non-owner", async function () {
+      await expect(
+        token.connect(addr1).withdrawEth(ethers.parseEther("1"))
+      ).to.be.revertedWith("DAppToken: caller is not the owner");
+    });
+
+    it("Should reject withdrawal of more ETH than available", async function () {
+      await expect(
+        token.withdrawEth(ethers.parseEther("1"))
+      ).to.be.revertedWith("DAppToken: insufficient ETH balance");
+    });
+
+    it("Should reject zero ETH deposits", async function () {
+      await expect(
+        addr1.sendTransaction({
+          to: await token.getAddress(),
+          value: 0
+        })
+      ).to.be.revertedWith("DAppToken: deposit amount must be positive");
+    });
+
+    it("Should handle emergency withdraw", async function () {
+      const depositAmount = ethers.parseEther("1");
+
+      // Deposit ETH
+      await addr1.sendTransaction({
+        to: await token.getAddress(),
+        value: depositAmount
+      });
+
+      // Emergency withdraw
+      await expect(
+        token.emergencyWithdraw(depositAmount)
+      ).to.emit(token, "EthWithdrawn")
+        .withArgs(owner.address, depositAmount);
+
+      expect(await token.getEthBalance()).to.equal(0);
+    });
+  });
+
   describe("View Functions", function () {
     it("Should return correct balance", async function () {
       await token.transfer(addr1.address, TRANSFER_AMOUNT);
-      
+
       const balance = await token.getBalance(addr1.address);
       expect(balance).to.equal(TRANSFER_AMOUNT);
     });
 
     it("Should return correct allowance", async function () {
       await token.approve(addr1.address, TRANSFER_AMOUNT);
-      
+
       const allowance = await token.getAllowance(owner.address, addr1.address);
       expect(allowance).to.equal(TRANSFER_AMOUNT);
+    });
+
+    it("Should return correct ETH balance", async function () {
+      const depositAmount = ethers.parseEther("0.5");
+
+      await addr1.sendTransaction({
+        to: await token.getAddress(),
+        value: depositAmount
+      });
+
+      expect(await token.getEthBalance()).to.equal(depositAmount);
     });
   });
 

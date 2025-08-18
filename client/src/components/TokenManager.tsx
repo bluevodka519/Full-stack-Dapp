@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { ethers } from 'ethers'
 
 /**
- * ERC20 Token Contract ABI
- * Standard ERC20 functions for token interaction
+ * Enhanced DApp Token Contract ABI
+ * Standard ERC20 functions plus ETH functionality
  */
 const TOKEN_ABI = [
   "function name() view returns (string)",
@@ -20,8 +20,15 @@ const TOKEN_ABI = [
   "function mint(address to, uint256 amount)",
   "function burn(uint256 amount)",
   "function owner() view returns (address)",
+  "function getEthBalance() view returns (uint256)",
+  "function withdrawEth(uint256 amount)",
+  "function withdrawAllEth()",
+  "function emergencyWithdraw(uint256 amount)",
+  "receive() external payable",
   "event Transfer(address indexed from, address indexed to, uint256 value)",
-  "event Approval(address indexed owner, address indexed spender, uint256 value)"
+  "event Approval(address indexed owner, address indexed spender, uint256 value)",
+  "event EthDeposited(address indexed from, uint256 value)",
+  "event EthWithdrawn(address indexed to, uint256 value)"
 ]
 
 /**
@@ -33,7 +40,7 @@ interface TokenTransferRecord {
   amount: string
   hash: string
   timestamp: number
-  type: 'transfer' | 'mint' | 'burn'
+  type: 'transfer' | 'mint' | 'burn' | 'eth_deposit' | 'eth_withdraw'
 }
 
 /**
@@ -67,6 +74,11 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
   const [burnAmount, setBurnAmount] = useState<string>('')
   const [isOwner, setIsOwner] = useState(false)
 
+  // ETH functionality states
+  const [contractEthBalance, setContractEthBalance] = useState<string>('0')
+  const [ethDepositAmount, setEthDepositAmount] = useState<string>('')
+  const [ethWithdrawAmount, setEthWithdrawAmount] = useState<string>('')
+
   /**
    * Connect to ERC20 token contract
    */
@@ -82,13 +94,14 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
       setTokenContract(contract)
 
       // Get token information
-      const [name, symbol, decimals, totalSupply, balance, owner] = await Promise.all([
+      const [name, symbol, decimals, totalSupply, balance, owner, ethBalance] = await Promise.all([
         contract.name(),
         contract.symbol(),
         contract.decimals(),
         contract.totalSupply(),
         contract.balanceOf(account),
-        contract.owner()
+        contract.owner(),
+        contract.getEthBalance()
       ])
 
       const tokenInfo: TokenInfo = {
@@ -102,6 +115,7 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
       setTokenInfo(tokenInfo)
       setTokenBalance(ethers.formatUnits(balance, decimals))
       setIsOwner(owner.toLowerCase() === account.toLowerCase())
+      setContractEthBalance(ethers.formatEther(ethBalance))
 
       alert(`Connected to ${name} (${symbol}) successfully!`)
     } catch (error) {
@@ -278,6 +292,153 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
     }
   }
 
+  /**
+   * Deposit ETH to contract
+   */
+  const depositEth = async () => {
+    if (!tokenContract || !ethDepositAmount) {
+      alert('Please enter deposit amount')
+      return
+    }
+
+    try {
+      setTokenLoading(true)
+
+      const amount = parseFloat(ethDepositAmount)
+      if (amount <= 0) {
+        alert('Deposit amount must be greater than 0')
+        return
+      }
+
+      const amountWei = ethers.parseEther(ethDepositAmount)
+      const tx = await signer.sendTransaction({
+        to: tokenAddress,
+        value: amountWei
+      })
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: account,
+        to: tokenAddress,
+        amount: ethDepositAmount,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'eth_deposit'
+      }
+      setTokenTransferHistory(prev => [newRecord, ...prev])
+
+      // Update ETH balance
+      await updateEthBalance()
+      setEthDepositAmount('')
+
+      alert(`Deposited ${ethDepositAmount} ETH successfully!`)
+    } catch (error) {
+      console.error('ETH deposit failed:', error)
+      alert('ETH deposit failed. Check your balance.')
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  /**
+   * Withdraw ETH from contract (owner only)
+   */
+  const withdrawEth = async () => {
+    if (!tokenContract || !ethWithdrawAmount || !isOwner) {
+      alert('Please enter withdraw amount (owner only)')
+      return
+    }
+
+    try {
+      setTokenLoading(true)
+
+      const amount = parseFloat(ethWithdrawAmount)
+      if (amount <= 0) {
+        alert('Withdraw amount must be greater than 0')
+        return
+      }
+
+      const amountWei = ethers.parseEther(ethWithdrawAmount)
+      const tx = await tokenContract.withdrawEth(amountWei)
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: tokenAddress,
+        to: account,
+        amount: ethWithdrawAmount,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'eth_withdraw'
+      }
+      setTokenTransferHistory(prev => [newRecord, ...prev])
+
+      // Update ETH balance
+      await updateEthBalance()
+      setEthWithdrawAmount('')
+
+      alert(`Withdrew ${ethWithdrawAmount} ETH successfully!`)
+    } catch (error) {
+      console.error('ETH withdrawal failed:', error)
+      alert('ETH withdrawal failed. Check contract balance.')
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  /**
+   * Withdraw all ETH from contract (owner only)
+   */
+  const withdrawAllEth = async () => {
+    if (!tokenContract || !isOwner) {
+      alert('Owner only function')
+      return
+    }
+
+    try {
+      setTokenLoading(true)
+
+      const tx = await tokenContract.withdrawAllEth()
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: tokenAddress,
+        to: account,
+        amount: contractEthBalance,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'eth_withdraw'
+      }
+      setTokenTransferHistory(prev => [newRecord, ...prev])
+
+      // Update ETH balance
+      await updateEthBalance()
+
+      alert(`Withdrew all ETH (${contractEthBalance} ETH) successfully!`)
+    } catch (error) {
+      console.error('ETH withdrawal failed:', error)
+      alert('ETH withdrawal failed.')
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  /**
+   * Update contract ETH balance
+   */
+  const updateEthBalance = async () => {
+    if (!tokenContract) return
+
+    try {
+      const ethBalance = await tokenContract.getEthBalance()
+      setContractEthBalance(ethers.formatEther(ethBalance))
+    } catch (error) {
+      console.error('Failed to update ETH balance:', error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Token Connection */}
@@ -420,6 +581,78 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
         </div>
       )}
 
+      {/* ETH Management */}
+      {tokenContract && tokenInfo && (
+        <div className="p-4 bg-purple-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4">ETH Management</h2>
+
+          {/* Contract ETH Balance */}
+          <div className="mb-4 p-3 bg-white rounded border">
+            <p className="text-sm font-medium text-gray-700">Contract ETH Balance</p>
+            <p className="text-xl font-bold text-purple-600">{contractEthBalance} ETH</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Deposit ETH */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Deposit ETH to Contract
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.001"
+                  placeholder="1.0"
+                  value={ethDepositAmount}
+                  onChange={(e) => setEthDepositAmount(e.target.value)}
+                  className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <button
+                  onClick={depositEth}
+                  disabled={tokenLoading || !ethDepositAmount}
+                  className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                >
+                  Deposit
+                </button>
+              </div>
+            </div>
+
+            {/* Withdraw ETH (Owner Only) */}
+            {isOwner && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Withdraw ETH (Owner Only)
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.5"
+                    value={ethWithdrawAmount}
+                    onChange={(e) => setEthWithdrawAmount(e.target.value)}
+                    className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={withdrawEth}
+                    disabled={tokenLoading || !ethWithdrawAmount}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    Withdraw
+                  </button>
+                </div>
+                <button
+                  onClick={withdrawAllEth}
+                  disabled={tokenLoading || contractEthBalance === '0'}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                >
+                  Withdraw All ETH
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Token Transaction History */}
       {tokenTransferHistory.length > 0 && (
         <div className="p-4 bg-gray-50 rounded-lg">
@@ -434,18 +667,24 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
                       <span className={`ml-1 px-2 py-1 rounded text-xs ${
                         record.type === 'mint' ? 'bg-green-100 text-green-800' :
                         record.type === 'burn' ? 'bg-red-100 text-red-800' :
+                        record.type === 'eth_deposit' ? 'bg-purple-100 text-purple-800' :
+                        record.type === 'eth_withdraw' ? 'bg-orange-100 text-orange-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
-                        {record.type.toUpperCase()}
+                        {record.type.replace('_', ' ').toUpperCase()}
                       </span>
                     </p>
-                    {record.type === 'transfer' && (
+                    {(record.type === 'transfer' || record.type === 'eth_deposit' || record.type === 'eth_withdraw') && (
                       <p className="text-sm">
-                        <span className="font-medium">To:</span> {record.to.slice(0, 10)}...{record.to.slice(-8)}
+                        <span className="font-medium">
+                          {record.type === 'eth_withdraw' ? 'From:' : 'To:'}
+                        </span> {record.to.slice(0, 10)}...{record.to.slice(-8)}
                       </p>
                     )}
                     <p className="text-sm">
-                      <span className="font-medium">Amount:</span> {record.amount} {tokenInfo?.symbol}
+                      <span className="font-medium">Amount:</span> {record.amount} {
+                        record.type.includes('eth') ? 'ETH' : tokenInfo?.symbol
+                      }
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(record.timestamp).toLocaleString()}
