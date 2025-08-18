@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
-import TokenManager from './TokenManager'
 
 /**
  * Counter Contract ABI - Application Binary Interface
@@ -472,13 +471,21 @@ export default function Counter() {
         </>
       )}
 
-      {/* Token Tab Content */}
+      {/* Token Tab Content - Moved to separate ERC20 Tokens tab */}
       {isConnected && activeTab === 'token' && (
-        <TokenManager
-          signer={signer}
-          account={account}
-          updateBalance={updateBalance}
-        />
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4">ERC20 Token Operations</h2>
+          <p className="text-gray-600 mb-4">
+            ERC20 token operations have been moved to the dedicated "ERC20 Tokens" tab for better organization.
+          </p>
+          <p className="text-sm text-gray-500">
+            Please use the main navigation tabs at the top of the page to access:
+          </p>
+          <ul className="text-sm text-gray-500 mt-2 space-y-1">
+            <li>• <strong>ERC20 Tokens</strong> - DDT token operations, staking, mint/burn</li>
+            <li>• <strong>ETH Transfer</strong> - Pure ETH transfer operations</li>
+          </ul>
+        </div>
       )}
 
       {/* Usage Instructions */}

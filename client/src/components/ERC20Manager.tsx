@@ -48,6 +48,13 @@ const TOKEN_ABI = [
   "function mint(address to, uint256 amount)",
   "function burn(uint256 amount)",
   "function owner() view returns (address)",
+
+  // ETH management functions (in DAppToken contract)
+  "function getEthBalance() view returns (uint256)",
+  "function withdrawEth(uint256 amount)",
+  "function withdrawAllEth()",
+  "function emergencyWithdraw(uint256 amount)",
+  "receive() external payable",
   
   // Staking functions
   "function stakeTokens(uint256 amount, uint256 duration)",
@@ -93,6 +100,11 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
   const [userStakes, setUserStakes] = useState<StakeInfo[]>([])
   const [totalStaked, setTotalStaked] = useState<string>('0')
 
+  // ETH management states
+  const [contractEthBalance, setContractEthBalance] = useState<string>('0')
+  const [ethDepositAmount, setEthDepositAmount] = useState<string>('')
+  const [ethWithdrawAmount, setEthWithdrawAmount] = useState<string>('')
+
   // History
   const [transferHistory, setTransferHistory] = useState<TokenTransferRecord[]>([])
 
@@ -111,13 +123,14 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
       const contract = new ethers.Contract(tokenAddress, TOKEN_ABI, signer)
       
       // Get token information
-      const [name, symbol, decimals, totalSupply, balance, owner] = await Promise.all([
+      const [name, symbol, decimals, totalSupply, balance, owner, ethBalance] = await Promise.all([
         contract.name(),
         contract.symbol(),
         contract.decimals(),
         contract.totalSupply(),
         contract.balanceOf(account),
-        contract.owner()
+        contract.owner(),
+        contract.getEthBalance()
       ])
 
       const tokenInfo: TokenInfo = {
@@ -131,6 +144,7 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
       setTokenInfo(tokenInfo)
       setTokenBalance(ethers.formatUnits(balance, decimals))
       setIsOwner(owner.toLowerCase() === account.toLowerCase())
+      setContractEthBalance(ethers.formatEther(ethBalance))
 
       // Load staking information
       await updateUserStakes(contract, tokenInfo)
@@ -295,6 +309,150 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
     } catch (error) {
       console.error('Burn failed:', error)
       alert('Burn failed. Check your balance and try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Update contract ETH balance
+   */
+  const updateEthBalance = async () => {
+    if (!tokenContract) return
+
+    try {
+      const ethBalance = await tokenContract.getEthBalance()
+      setContractEthBalance(ethers.formatEther(ethBalance))
+    } catch (error) {
+      console.error('Failed to update ETH balance:', error)
+    }
+  }
+
+  /**
+   * Deposit ETH to contract
+   */
+  const depositEth = async () => {
+    if (!signer || !ethDepositAmount) {
+      alert('Please enter deposit amount')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const amount = parseFloat(ethDepositAmount)
+      if (amount <= 0) {
+        alert('Deposit amount must be greater than 0')
+        return
+      }
+
+      const amountWei = ethers.parseEther(ethDepositAmount)
+      const tx = await signer.sendTransaction({
+        to: tokenAddress,
+        value: amountWei
+      })
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: account,
+        to: 'Contract',
+        amount: ethDepositAmount,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'transfer'
+      }
+      setTransferHistory(prev => [newRecord, ...prev])
+
+      // Update balance
+      await updateEthBalance()
+      setEthDepositAmount('')
+
+      alert(`Deposited ${ethDepositAmount} ETH to contract successfully!`)
+    } catch (error) {
+      console.error('ETH deposit failed:', error)
+      alert('ETH deposit failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Withdraw ETH from contract (Owner only)
+   */
+  const withdrawEth = async () => {
+    if (!tokenContract || !ethWithdrawAmount) {
+      alert('Please enter withdraw amount')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const amount = parseFloat(ethWithdrawAmount)
+      if (amount <= 0) {
+        alert('Withdraw amount must be greater than 0')
+        return
+      }
+
+      const amountWei = ethers.parseEther(ethWithdrawAmount)
+      const tx = await tokenContract.withdrawEth(amountWei)
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: 'Contract',
+        to: account,
+        amount: ethWithdrawAmount,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'transfer'
+      }
+      setTransferHistory(prev => [newRecord, ...prev])
+
+      // Update balance
+      await updateEthBalance()
+      setEthWithdrawAmount('')
+
+      alert(`Withdrew ${ethWithdrawAmount} ETH from contract successfully!`)
+    } catch (error) {
+      console.error('ETH withdraw failed:', error)
+      alert('ETH withdraw failed. Make sure you are the owner.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Withdraw all ETH from contract (Owner only)
+   */
+  const withdrawAllEth = async () => {
+    if (!tokenContract) return
+
+    try {
+      setLoading(true)
+
+      const tx = await tokenContract.withdrawAllEth()
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: 'Contract',
+        to: account,
+        amount: contractEthBalance,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'transfer'
+      }
+      setTransferHistory(prev => [newRecord, ...prev])
+
+      // Update balance
+      await updateEthBalance()
+
+      alert(`Withdrew all ETH from contract successfully!`)
+    } catch (error) {
+      console.error('Withdraw all ETH failed:', error)
+      alert('Withdraw all ETH failed. Make sure you are the owner.')
     } finally {
       setLoading(false)
     }
@@ -511,6 +669,39 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
           {isOwner && (
             <div className="mb-6">
               <h3 className="text-md font-semibold mb-3">Owner Functions</h3>
+
+              {/* Quick Test Token Distribution */}
+              <div className="mb-4 p-3 bg-green-50 rounded border">
+                <h4 className="text-sm font-semibold mb-2">Quick Test Token Distribution</h4>
+                <p className="text-xs text-gray-600 mb-2">
+                  Mint test tokens for users to try staking and other features
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setMintTo(account)
+                      setMintAmount('1000')
+                      mintTokens()
+                    }}
+                    disabled={loading}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                  >
+                    Get 1000 DDT
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMintTo(account)
+                      setMintAmount('5000')
+                      mintTokens()
+                    }}
+                    disabled={loading}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                  >
+                    Get 5000 DDT
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Mint Tokens */}
                 <div>
@@ -565,6 +756,74 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
               </div>
             </div>
           )}
+
+          {/* ETH Management */}
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-3">ETH Management</h3>
+
+            {/* Contract ETH Balance */}
+            <div className="p-3 bg-white rounded border mb-4">
+              <p className="text-sm font-medium text-gray-700">Contract ETH Balance</p>
+              <p className="text-2xl font-bold text-purple-600">{parseFloat(contractEthBalance).toLocaleString()} ETH</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Deposit ETH */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Deposit ETH to Contract</h4>
+                <div className="space-y-2">
+                  <input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.1"
+                    value={ethDepositAmount}
+                    onChange={(e) => setEthDepositAmount(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={depositEth}
+                    disabled={loading || !ethDepositAmount}
+                    className="w-full bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {loading ? 'Depositing...' : 'Deposit ETH'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Withdraw ETH (Owner Only) */}
+              {isOwner && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Withdraw ETH (Owner Only)</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.1"
+                      value={ethWithdrawAmount}
+                      onChange={(e) => setEthWithdrawAmount(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={withdrawEth}
+                        disabled={loading || !ethWithdrawAmount}
+                        className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                      >
+                        {loading ? 'Withdrawing...' : 'Withdraw'}
+                      </button>
+                      <button
+                        onClick={withdrawAllEth}
+                        disabled={loading || contractEthBalance === '0'}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                      >
+                        Withdraw All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Token Staking */}
           <div className="mb-6">
