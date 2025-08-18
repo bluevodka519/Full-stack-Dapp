@@ -21,6 +21,22 @@ contract DAppToken {
     
     // Mapping from account to spender approvals
     mapping(address => mapping(address => uint256)) public allowance;
+
+    // Staking functionality
+    struct StakeInfo {
+        uint256 amount;
+        uint256 startTime;
+        uint256 duration; // in seconds
+        uint256 unlockTime;
+        bool claimed;
+    }
+
+    mapping(address => StakeInfo[]) public stakes;
+    mapping(address => uint256) public totalStaked;
+    uint256 public totalStakedSupply;
+
+    // Staking rewards: 5% APY for 1 month, 8% for 3 months, 12% for 6 months, 20% for 1 year
+    mapping(uint256 => uint256) public stakingRewards; // duration => reward rate (basis points)
     
     // Events as per ERC20 standard
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -32,6 +48,8 @@ contract DAppToken {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event EthDeposited(address indexed from, uint256 value);
     event EthWithdrawn(address indexed to, uint256 value);
+    event TokensStaked(address indexed user, uint256 amount, uint256 duration, uint256 unlockTime);
+    event TokensUnstaked(address indexed user, uint256 amount, uint256 reward);
     
     // Modifiers
     modifier onlyOwner() {
@@ -52,6 +70,13 @@ contract DAppToken {
         owner = msg.sender;
         totalSupply = _initialSupply;
         balanceOf[msg.sender] = _initialSupply;
+
+        // Initialize staking rewards (basis points: 10000 = 100%)
+        stakingRewards[30 days] = 500;   // 5% APY for 1 month
+        stakingRewards[90 days] = 800;   // 8% APY for 3 months
+        stakingRewards[180 days] = 1200; // 12% APY for 6 months
+        stakingRewards[365 days] = 2000; // 20% APY for 1 year
+
         emit Transfer(address(0), msg.sender, _initialSupply);
     }
     
@@ -246,5 +271,145 @@ contract DAppToken {
         require(success, "DAppToken: ETH transfer failed");
 
         emit EthWithdrawn(owner, _amount);
+    }
+
+    /**
+     * @dev Stake tokens for a specific duration
+     * @param _amount Amount of tokens to stake
+     * @param _duration Duration in seconds (30 days, 90 days, 180 days, or 365 days)
+     */
+    function stakeTokens(uint256 _amount, uint256 _duration) external {
+        require(_amount > 0, "DAppToken: stake amount must be positive");
+        require(balanceOf[msg.sender] >= _amount, "DAppToken: insufficient balance");
+        require(stakingRewards[_duration] > 0, "DAppToken: invalid staking duration");
+
+        // Transfer tokens from user to contract
+        balanceOf[msg.sender] -= _amount;
+        totalStaked[msg.sender] += _amount;
+        totalStakedSupply += _amount;
+
+        // Create stake record
+        uint256 unlockTime = block.timestamp + _duration;
+        stakes[msg.sender].push(StakeInfo({
+            amount: _amount,
+            startTime: block.timestamp,
+            duration: _duration,
+            unlockTime: unlockTime,
+            claimed: false
+        }));
+
+        emit TokensStaked(msg.sender, _amount, _duration, unlockTime);
+    }
+
+    /**
+     * @dev Unstake tokens and claim rewards
+     * @param _stakeIndex Index of the stake to unstake
+     */
+    function unstakeTokens(uint256 _stakeIndex) external {
+        require(_stakeIndex < stakes[msg.sender].length, "DAppToken: invalid stake index");
+
+        StakeInfo storage stake = stakes[msg.sender][_stakeIndex];
+        require(!stake.claimed, "DAppToken: stake already claimed");
+        require(block.timestamp >= stake.unlockTime, "DAppToken: stake still locked");
+
+        uint256 stakedAmount = stake.amount;
+        uint256 reward = calculateReward(msg.sender, _stakeIndex);
+        uint256 totalReturn = stakedAmount + reward;
+
+        // Mark as claimed
+        stake.claimed = true;
+        totalStaked[msg.sender] -= stakedAmount;
+        totalStakedSupply -= stakedAmount;
+
+        // Return staked tokens + rewards
+        balanceOf[msg.sender] += totalReturn;
+
+        emit TokensUnstaked(msg.sender, stakedAmount, reward);
+    }
+
+    /**
+     * @dev Calculate staking reward for a specific stake
+     * @param _user User address
+     * @param _stakeIndex Index of the stake
+     * @return reward Calculated reward amount
+     */
+    function calculateReward(address _user, uint256 _stakeIndex) public view returns (uint256 reward) {
+        require(_stakeIndex < stakes[_user].length, "DAppToken: invalid stake index");
+
+        StakeInfo memory stake = stakes[_user][_stakeIndex];
+        if (stake.claimed) return 0;
+
+        uint256 rewardRate = stakingRewards[stake.duration];
+        // Calculate reward: (amount * rate * duration) / (10000 * 365 days)
+        reward = (stake.amount * rewardRate * stake.duration) / (10000 * 365 days);
+
+        return reward;
+    }
+
+    /**
+     * @dev Get user's stake information
+     * @param _user User address
+     * @return stakeCount Number of stakes
+     */
+    function getUserStakes(address _user) external view returns (uint256 stakeCount) {
+        return stakes[_user].length;
+    }
+
+    /**
+     * @dev Get specific stake details
+     * @param _user User address
+     * @param _stakeIndex Stake index
+     * @return amount Staked amount
+     * @return startTime Stake start time
+     * @return duration Stake duration
+     * @return unlockTime Unlock time
+     * @return claimed Whether claimed
+     * @return reward Current reward amount
+     */
+    function getStakeDetails(address _user, uint256 _stakeIndex)
+        external
+        view
+        returns (
+            uint256 amount,
+            uint256 startTime,
+            uint256 duration,
+            uint256 unlockTime,
+            bool claimed,
+            uint256 reward
+        )
+    {
+        require(_stakeIndex < stakes[_user].length, "DAppToken: invalid stake index");
+
+        StakeInfo memory stake = stakes[_user][_stakeIndex];
+        return (
+            stake.amount,
+            stake.startTime,
+            stake.duration,
+            stake.unlockTime,
+            stake.claimed,
+            calculateReward(_user, _stakeIndex)
+        );
+    }
+
+    /**
+     * @dev Get available staking durations and their reward rates
+     * @return durations Array of available durations
+     * @return rates Array of corresponding reward rates (basis points)
+     */
+    function getStakingOptions() external view returns (uint256[] memory durations, uint256[] memory rates) {
+        durations = new uint256[](4);
+        rates = new uint256[](4);
+
+        durations[0] = 30 days;
+        durations[1] = 90 days;
+        durations[2] = 180 days;
+        durations[3] = 365 days;
+
+        rates[0] = stakingRewards[30 days];
+        rates[1] = stakingRewards[90 days];
+        rates[2] = stakingRewards[180 days];
+        rates[3] = stakingRewards[365 days];
+
+        return (durations, rates);
     }
 }

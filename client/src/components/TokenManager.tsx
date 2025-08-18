@@ -282,6 +282,12 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
   const [ethDepositAmount, setEthDepositAmount] = useState<string>('')
   const [ethWithdrawAmount, setEthWithdrawAmount] = useState<string>('')
 
+  // Staking functionality states
+  const [stakeAmount, setStakeAmount] = useState<string>('')
+  const [selectedStakeDuration, setSelectedStakeDuration] = useState<string>('30')
+  const [userStakes, setUserStakes] = useState<any[]>([])
+  const [totalStaked, setTotalStaked] = useState<string>('0')
+
   /**
    * Connect to ERC20 token contract
    */
@@ -319,6 +325,9 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
       setTokenBalance(ethers.formatUnits(balance, decimals))
       setIsOwner(owner.toLowerCase() === account.toLowerCase())
       setContractEthBalance(ethers.formatEther(ethBalance))
+
+      // Update staking information
+      await updateUserStakes()
 
       alert(`Connected to ${name} (${symbol}) successfully!`)
     } catch (error) {
@@ -642,6 +651,115 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
     }
   }
 
+  /**
+   * Stake tokens for a specific duration
+   */
+  const stakeTokens = async () => {
+    if (!tokenContract || !stakeAmount || !tokenInfo) {
+      alert('Please enter stake amount')
+      return
+    }
+
+    try {
+      setTokenLoading(true)
+
+      const amount = parseFloat(stakeAmount)
+      if (amount <= 0) {
+        alert('Stake amount must be greater than 0')
+        return
+      }
+
+      const amountWei = ethers.parseUnits(stakeAmount, tokenInfo.decimals)
+      const durationInSeconds = parseInt(selectedStakeDuration) * 24 * 60 * 60 // days to seconds
+
+      const tx = await tokenContract.stakeTokens(amountWei, durationInSeconds)
+      await tx.wait()
+
+      // Add to history
+      const newRecord: TokenTransferRecord = {
+        from: account,
+        to: 'Staking Contract',
+        amount: stakeAmount,
+        hash: tx.hash,
+        timestamp: Date.now(),
+        type: 'transfer'
+      }
+      setTokenTransferHistory(prev => [newRecord, ...prev])
+
+      // Update balances
+      await updateTokenBalance()
+      await updateUserStakes()
+      setStakeAmount('')
+
+      alert(`Staked ${stakeAmount} ${tokenInfo.symbol} for ${selectedStakeDuration} days successfully!`)
+    } catch (error) {
+      console.error('Staking failed:', error)
+      alert('Staking failed. Check your balance and try again.')
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  /**
+   * Unstake tokens and claim rewards
+   */
+  const unstakeTokens = async (stakeIndex: number) => {
+    if (!tokenContract) return
+
+    try {
+      setTokenLoading(true)
+
+      const tx = await tokenContract.unstakeTokens(stakeIndex)
+      await tx.wait()
+
+      // Update balances
+      await updateTokenBalance()
+      await updateUserStakes()
+
+      alert('Tokens unstaked successfully!')
+    } catch (error) {
+      console.error('Unstaking failed:', error)
+      alert('Unstaking failed. Make sure the stake period has ended.')
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+
+  /**
+   * Update user's staking information
+   */
+  const updateUserStakes = async () => {
+    if (!tokenContract) return
+
+    try {
+      const stakeCount = await tokenContract.getUserStakes(account)
+      const stakes = []
+
+      for (let i = 0; i < stakeCount; i++) {
+        const stakeDetails = await tokenContract.getStakeDetails(account, i)
+        stakes.push({
+          index: i,
+          amount: ethers.formatUnits(stakeDetails[0], tokenInfo?.decimals || 18),
+          startTime: new Date(Number(stakeDetails[1]) * 1000),
+          duration: Number(stakeDetails[2]) / (24 * 60 * 60), // seconds to days
+          unlockTime: new Date(Number(stakeDetails[3]) * 1000),
+          claimed: stakeDetails[4],
+          reward: ethers.formatUnits(stakeDetails[5], tokenInfo?.decimals || 18)
+        })
+      }
+
+      setUserStakes(stakes)
+
+      // Calculate total staked
+      const totalStakedAmount = stakes
+        .filter(stake => !stake.claimed)
+        .reduce((sum, stake) => sum + parseFloat(stake.amount), 0)
+      setTotalStaked(totalStakedAmount.toString())
+    } catch (error) {
+      console.error('Failed to update user stakes:', error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Token Connection */}
@@ -687,10 +805,10 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
         </div>
       )}
 
-      {/* Token Transfer */}
+      {/* ERC20 Token Operations */}
       {tokenContract && tokenInfo && (
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h2 className="text-lg font-semibold mb-4">Transfer Tokens</h2>
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4">ERC20 Token Operations</h2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -853,6 +971,117 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Token Staking */}
+      {tokenContract && tokenInfo && (
+        <div className="p-4 bg-green-50 rounded-lg">
+          <h2 className="text-lg font-semibold mb-4">Token Staking</h2>
+
+          {/* Staking Stats */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="p-3 bg-white rounded border">
+              <p className="text-sm font-medium text-gray-700">Your Staked Balance</p>
+              <p className="text-xl font-bold text-green-600">{parseFloat(totalStaked).toLocaleString()} {tokenInfo.symbol}</p>
+            </div>
+            <div className="p-3 bg-white rounded border">
+              <p className="text-sm font-medium text-gray-700">Active Stakes</p>
+              <p className="text-xl font-bold text-green-600">{userStakes.filter(s => !s.claimed).length}</p>
+            </div>
+          </div>
+
+          {/* Stake Tokens */}
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-3">Stake Tokens</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Amount ({tokenInfo.symbol})
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  placeholder="100"
+                  value={stakeAmount}
+                  onChange={(e) => setStakeAmount(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Duration
+                </label>
+                <select
+                  value={selectedStakeDuration}
+                  onChange={(e) => setSelectedStakeDuration(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="30">1 Month (5% APY)</option>
+                  <option value="90">3 Months (8% APY)</option>
+                  <option value="180">6 Months (12% APY)</option>
+                  <option value="365">1 Year (20% APY)</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={stakeTokens}
+                  disabled={tokenLoading || !stakeAmount}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                >
+                  {tokenLoading ? 'Staking...' : 'Stake Tokens'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Stakes */}
+          {userStakes.length > 0 && (
+            <div>
+              <h3 className="text-md font-semibold mb-3">Your Stakes</h3>
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {userStakes.map((stake, index) => (
+                  <div key={index} className="bg-white p-4 rounded border">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium text-gray-700">Amount</p>
+                        <p className="text-green-600 font-bold">{parseFloat(stake.amount).toLocaleString()} {tokenInfo.symbol}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-700">Duration</p>
+                        <p>{stake.duration} days</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-700">Reward</p>
+                        <p className="text-green-600 font-bold">{parseFloat(stake.reward).toLocaleString()} {tokenInfo.symbol}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-700">Status</p>
+                        {stake.claimed ? (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">Claimed</span>
+                        ) : new Date() >= stake.unlockTime ? (
+                          <button
+                            onClick={() => unstakeTokens(stake.index)}
+                            disabled={tokenLoading}
+                            className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs disabled:opacity-50"
+                          >
+                            Unstake
+                          </button>
+                        ) : (
+                          <div>
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">Locked</span>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Until: {stake.unlockTime.toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
