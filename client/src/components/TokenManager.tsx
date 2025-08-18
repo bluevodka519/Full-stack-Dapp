@@ -5,30 +5,233 @@ import { ethers } from 'ethers'
 
 /**
  * Enhanced DApp Token Contract ABI
- * Standard ERC20 functions plus ETH functionality
+ * Complete ABI with all functions and events
  */
 const TOKEN_ABI = [
-  "function name() view returns (string)",
-  "function symbol() view returns (string)",
-  "function decimals() view returns (uint8)",
-  "function totalSupply() view returns (uint256)",
-  "function balanceOf(address) view returns (uint256)",
-  "function transfer(address to, uint256 amount) returns (bool)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function transferFrom(address from, address to, uint256 amount) returns (bool)",
-  "function mint(address to, uint256 amount)",
-  "function burn(uint256 amount)",
-  "function owner() view returns (address)",
-  "function getEthBalance() view returns (uint256)",
-  "function withdrawEth(uint256 amount)",
-  "function withdrawAllEth()",
-  "function emergencyWithdraw(uint256 amount)",
-  "receive() external payable",
-  "event Transfer(address indexed from, address indexed to, uint256 value)",
-  "event Approval(address indexed owner, address indexed spender, uint256 value)",
-  "event EthDeposited(address indexed from, uint256 value)",
-  "event EthWithdrawn(address indexed to, uint256 value)"
+  {
+    "inputs": [{"internalType": "uint256", "name": "_initialSupply", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "spender", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "Approval",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "Burn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "EthDeposited",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "EthWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "Mint",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "previousOwner", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "newOwner", "type": "address"}
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
+      {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
+      {"indexed": false, "internalType": "uint256", "name": "value", "type": "uint256"}
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {"stateMutability": "payable", "type": "fallback"},
+  {
+    "inputs": [
+      {"internalType": "address", "name": "", "type": "address"},
+      {"internalType": "address", "name": "", "type": "address"}
+    ],
+    "name": "allowance",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "_spender", "type": "address"},
+      {"internalType": "uint256", "name": "_value", "type": "uint256"}
+    ],
+    "name": "approve",
+    "outputs": [{"internalType": "bool", "name": "success", "type": "bool"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "name": "balanceOf",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "_value", "type": "uint256"}],
+    "name": "burn",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "_amount", "type": "uint256"}],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "_owner", "type": "address"},
+      {"internalType": "address", "name": "_spender", "type": "address"}
+    ],
+    "name": "getAllowance",
+    "outputs": [{"internalType": "uint256", "name": "remaining", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "_owner", "type": "address"}],
+    "name": "getBalance",
+    "outputs": [{"internalType": "uint256", "name": "balance", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getEthBalance",
+    "outputs": [{"internalType": "uint256", "name": "balance", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "_to", "type": "address"},
+      {"internalType": "uint256", "name": "_value", "type": "uint256"}
+    ],
+    "name": "mint",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "name",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "_to", "type": "address"},
+      {"internalType": "uint256", "name": "_value", "type": "uint256"}
+    ],
+    "name": "transfer",
+    "outputs": [{"internalType": "bool", "name": "success", "type": "bool"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"internalType": "address", "name": "_from", "type": "address"},
+      {"internalType": "address", "name": "_to", "type": "address"},
+      {"internalType": "uint256", "name": "_value", "type": "uint256"}
+    ],
+    "name": "transferFrom",
+    "outputs": [{"internalType": "bool", "name": "success", "type": "bool"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "address", "name": "_newOwner", "type": "address"}],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawAllEth",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"internalType": "uint256", "name": "_amount", "type": "uint256"}],
+    "name": "withdrawEth",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {"stateMutability": "payable", "type": "receive"}
 ]
 
 /**
@@ -170,7 +373,7 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
 
       // Send transaction
       const tx = await tokenContract.transfer(tokenTransferTo, amountWei)
-      const receipt = await tx.wait()
+      await tx.wait()
 
       // Add to history
       const newRecord: TokenTransferRecord = {
@@ -311,7 +514,7 @@ export default function TokenManager({ signer, account, updateBalance }: TokenMa
       }
 
       const amountWei = ethers.parseEther(ethDepositAmount)
-      const tx = await signer.sendTransaction({
+      const tx = await signer!.sendTransaction({
         to: tokenAddress,
         value: amountWei
       })
