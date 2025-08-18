@@ -287,46 +287,8 @@ export default function Counter() {
         )}
       </div>
 
-      {/* Tab Navigation */}
+      {/* Counter Content */}
       {isConnected && (
-        <div className="mb-6">
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('counter')}
-              className={`px-4 py-2 font-medium ${
-                activeTab === 'counter'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Smart Contract
-            </button>
-            <button
-              onClick={() => setActiveTab('transfer')}
-              className={`px-4 py-2 font-medium ${
-                activeTab === 'transfer'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              ETH Transfer
-            </button>
-            <button
-              onClick={() => setActiveTab('token')}
-              className={`px-4 py-2 font-medium ${
-                activeTab === 'token'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              ERC20 Tokens
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Counter Tab Content */}
-      {isConnected && activeTab === 'counter' && (
         <>
           {/* Contract Connection */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -390,103 +352,9 @@ export default function Counter() {
         </>
       )}
 
-      {/* Transfer Tab Content */}
-      {isConnected && activeTab === 'transfer' && (
-        <>
-          {/* Transfer Form */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h2 className="text-lg font-semibold mb-4">Send ETH</h2>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Recipient Address
-                </label>
-                <input
-                  type="text"
-                  placeholder="0x..."
-                  value={transferTo}
-                  onChange={(e) => setTransferTo(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount (ETH)
-                </label>
-                <input
-                  type="number"
-                  step="0.001"
-                  placeholder="0.1"
-                  value={transferAmount}
-                  onChange={(e) => setTransferAmount(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
 
-              <button
-                onClick={transferETH}
-                disabled={transferLoading || !transferTo || !transferAmount}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-              >
-                {transferLoading ? 'Sending...' : 'Send ETH'}
-              </button>
-            </div>
-          </div>
-
-          {/* Transfer History */}
-          {transferHistory.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h2 className="text-lg font-semibold mb-4">Transfer History</h2>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {transferHistory.map((record, index) => (
-                  <div key={index} className="bg-white p-3 rounded border">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm">
-                          <span className="font-medium">To:</span> {record.to.slice(0, 10)}...{record.to.slice(-8)}
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-medium">Amount:</span> {record.amount} ETH
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(record.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                      <a
-                        href={`https://etherscan.io/tx/${record.hash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-700 text-xs"
-                      >
-                        View TX
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Token Tab Content - Moved to separate ERC20 Tokens tab */}
-      {isConnected && activeTab === 'token' && (
-        <div className="p-4 bg-blue-50 rounded-lg">
-          <h2 className="text-lg font-semibold mb-4">ERC20 Token Operations</h2>
-          <p className="text-gray-600 mb-4">
-            ERC20 token operations have been moved to the dedicated "ERC20 Tokens" tab for better organization.
-          </p>
-          <p className="text-sm text-gray-500">
-            Please use the main navigation tabs at the top of the page to access:
-          </p>
-          <ul className="text-sm text-gray-500 mt-2 space-y-1">
-            <li>• <strong>ERC20 Tokens</strong> - DDT token operations, staking, mint/burn</li>
-            <li>• <strong>ETH Transfer</strong> - Pure ETH transfer operations</li>
-          </ul>
-        </div>
-      )}
 
       {/* Usage Instructions */}
       <div className="p-4 bg-yellow-50 rounded-lg">

@@ -8,6 +8,7 @@ interface TokenInfo {
   symbol: string
   decimals: number
   totalSupply: string
+  owner: string
 }
 
 interface TokenTransferRecord {
@@ -137,7 +138,8 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
         name,
         symbol,
         decimals: Number(decimals),
-        totalSupply: ethers.formatUnits(totalSupply, decimals)
+        totalSupply: ethers.formatUnits(totalSupply, decimals),
+        owner
       }
 
       setTokenContract(contract)
@@ -665,17 +667,18 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
             </div>
           </div>
 
-          {/* Owner Functions */}
-          {isOwner && (
-            <div className="mb-6">
-              <h3 className="text-md font-semibold mb-3">Owner Functions</h3>
-
-              {/* Quick Test Token Distribution */}
-              <div className="mb-4 p-3 bg-green-50 rounded border">
-                <h4 className="text-sm font-semibold mb-2">Quick Test Token Distribution</h4>
-                <p className="text-xs text-gray-600 mb-2">
-                  Mint test tokens for users to try staking and other features
-                </p>
+          {/* Test Token Distribution - Available for all users */}
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-3">Get Test Tokens</h3>
+            <div className="p-3 bg-green-50 rounded border">
+              <h4 className="text-sm font-semibold mb-2">Request Test Tokens</h4>
+              <p className="text-xs text-gray-600 mb-2">
+                {isOwner
+                  ? "As the contract owner, you can mint tokens for testing"
+                  : "Request test tokens to try staking and other features. Note: Only the contract owner can mint tokens."
+                }
+              </p>
+              {isOwner ? (
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
@@ -700,7 +703,28 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
                     Get 5000 DDT
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-orange-600 font-medium">
+                    ⚠️ You are not the contract owner. To get test tokens:
+                  </p>
+                  <ol className="text-xs text-gray-600 space-y-1">
+                    <li>1. Switch to the first Hardhat account (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)</li>
+                    <li>2. Or ask the contract owner to send you some DDT tokens</li>
+                    <li>3. Or use the transfer function if you have access to an account with DDT</li>
+                  </ol>
+                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                    <strong>Contract Owner:</strong> {tokenInfo?.owner ? `${tokenInfo.owner.slice(0, 6)}...${tokenInfo.owner.slice(-4)}` : 'Loading...'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Owner Functions */}
+          {isOwner && (
+            <div className="mb-6">
+              <h3 className="text-md font-semibold mb-3">Owner Functions</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Mint Tokens */}
