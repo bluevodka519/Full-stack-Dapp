@@ -123,6 +123,13 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
   // UI states
   const [showContractCode, setShowContractCode] = useState<boolean>(false)
 
+  // Ensure default address is set on component mount
+  useEffect(() => {
+    if (!tokenAddress) {
+      setTokenAddress(DEFAULT_CONTRACT_ADDRESS)
+    }
+  }, [tokenAddress])
+
   /**
    * Connect to ERC20 token contract
    */
@@ -627,21 +634,29 @@ export default function ERC20Manager({ account, signer }: ERC20ManagerProps) {
         </div>
 
         {/* Connection */}
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text"
-            placeholder="Contract address (auto-filled)"
-            value={tokenAddress}
-            onChange={(e) => setTokenAddress(e.target.value)}
-            className="flex-1 px-3 py-2 border rounded text-sm"
-          />
-          <button
-            onClick={connectToken}
-            disabled={loading}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-          >
-            {loading ? 'Connecting...' : 'Connect'}
-          </button>
+        <div className="space-y-2 mb-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Contract address (auto-filled)"
+              value={tokenAddress || DEFAULT_CONTRACT_ADDRESS}
+              onChange={(e) => setTokenAddress(e.target.value)}
+              className="flex-1 px-3 py-2 border rounded text-sm font-mono"
+              readOnly={tokenAddress === DEFAULT_CONTRACT_ADDRESS}
+            />
+            <button
+              onClick={connectToken}
+              disabled={loading || !account || !signer}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              {loading ? 'Connecting...' : 'Connect'}
+            </button>
+          </div>
+          {(!account || !signer) && (
+            <p className="text-xs text-orange-600">
+              ⚠️ Please connect your wallet first using the "Connect MetaMask" button above
+            </p>
+          )}
         </div>
 
         {/* Contract Code Toggle */}

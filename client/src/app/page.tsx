@@ -179,7 +179,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-              {activeTab === 'smart-contract' && <Counter />}
+              {activeTab === 'smart-contract' && <Counter account={account} signer={signer} />}
               {activeTab === 'erc20' && <ERC20Manager account={account} signer={signer} />}
               {activeTab === 'eth-transfer' && <ETHTransfer account={account} signer={signer} balance={balance} updateBalance={updateBalance} />}
             </>
