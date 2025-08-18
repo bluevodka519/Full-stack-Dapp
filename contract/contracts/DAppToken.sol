@@ -22,6 +22,9 @@ contract DAppToken {
     // Mapping from account to spender approvals
     mapping(address => mapping(address => uint256)) public allowance;
 
+    // ETH balance tracking for each user
+    mapping(address => uint256) public ethBalanceOf;
+
     // Staking functionality
     struct StakeInfo {
         uint256 amount;
@@ -216,6 +219,7 @@ contract DAppToken {
      */
     receive() external payable {
         require(msg.value > 0, "DAppToken: deposit amount must be positive");
+        ethBalanceOf[msg.sender] += msg.value;
         emit EthDeposited(msg.sender, msg.value);
     }
 
@@ -225,11 +229,39 @@ contract DAppToken {
      */
     fallback() external payable {
         require(msg.value > 0, "DAppToken: deposit amount must be positive");
+        ethBalanceOf[msg.sender] += msg.value;
         emit EthDeposited(msg.sender, msg.value);
     }
 
     /**
-     * @dev Withdraw ETH from contract (only owner)
+     * @dev Withdraw user's own ETH from contract
+     * @param _amount Amount of ETH to withdraw (in wei)
+     */
+    function withdrawMyEth(uint256 _amount) external {
+        require(_amount > 0, "DAppToken: withdraw amount must be positive");
+        require(ethBalanceOf[msg.sender] >= _amount, "DAppToken: insufficient user ETH balance");
+        require(address(this).balance >= _amount, "DAppToken: insufficient contract ETH balance");
+
+        ethBalanceOf[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit EthWithdrawn(msg.sender, _amount);
+    }
+
+    /**
+     * @dev Withdraw all user's ETH from contract
+     */
+    function withdrawAllMyEth() external {
+        uint256 userBalance = ethBalanceOf[msg.sender];
+        require(userBalance > 0, "DAppToken: no ETH to withdraw");
+        require(address(this).balance >= userBalance, "DAppToken: insufficient contract ETH balance");
+
+        ethBalanceOf[msg.sender] = 0;
+        payable(msg.sender).transfer(userBalance);
+        emit EthWithdrawn(msg.sender, userBalance);
+    }
+
+    /**
+     * @dev Withdraw ETH from contract (only owner) - for emergency or fees
      * @param _amount Amount of ETH to withdraw (in wei)
      */
     function withdrawEth(uint256 _amount) external onlyOwner {
@@ -257,6 +289,15 @@ contract DAppToken {
      */
     function getEthBalance() external view returns (uint256 balance) {
         return address(this).balance;
+    }
+
+    /**
+     * @dev Get user's ETH balance in contract
+     * @param _user User address
+     * @return balance User's ETH balance in wei
+     */
+    function getUserEthBalance(address _user) external view returns (uint256 balance) {
+        return ethBalanceOf[_user];
     }
 
     /**
